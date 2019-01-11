@@ -1,6 +1,7 @@
 # Human Pose Estimation
 
 ```sh
+# mpii
 python pose_estimation/valid.py \
     --frequent 1 \
     --cfg experiments/mpii/resnet50/256x256_d256x3_adam_lr1e-3.yaml \
@@ -16,5 +17,19 @@ python pose_estimation/infer.py \
     --cfg experiments/mpii/resnet50/256x256_d256x3_adam_lr1e-3.yaml \
     --model-file models/pytorch/pose_mpii/pose_resnet_50_256x256.pth.tar \
     --im-file data/mpii/images/000001163.jpg
+
+```
+
+```sh
+# coco_custom
+python pose_estimation/valid.py \
+    --cfg experiments/coco_custom/resnet50/256x192_d256x3_adam_lr1e-3.yaml \
+    --flip-test \
+    --model-file models/pytorch/pose_coco/pose_resnet_50_256x192.pth.tar
+# coco
+python pose_estimation/valid.py \
+    --cfg experiments/coco/resnet50/256x192_d256x3_adam_lr1e-3.yaml \
+    --flip-test \
+    --model-file models/pytorch/pose_coco/pose_resnet_50_256x192.pth.tar
 
 ```

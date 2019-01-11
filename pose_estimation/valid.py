@@ -32,11 +32,6 @@ from utils.utils import create_logger
 import dataset
 import models
 
-def default_args():
-    return {
-        "": ""
-    }
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Train keypoints network')
     # general
