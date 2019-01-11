@@ -12,6 +12,7 @@ from __future__ import print_function
 import argparse
 import os
 import pprint
+import cv2
 
 import torch
 import torch.nn.parallel
@@ -50,33 +51,17 @@ def parse_args():
     update_config(args.cfg)
 
     # training
-    parser.add_argument('--frequent',
-                        help='frequency of logging',
-                        default=config.PRINT_FREQ,
-                        type=int)
     parser.add_argument('--gpus',
                         help='gpus',
                         type=str)
-    parser.add_argument('--workers',
-                        help='num of dataloader workers',
-                        type=int)
     parser.add_argument('--model-file',
                         help='model state file',
                         type=str)
-    parser.add_argument('--use-detect-bbox',
-                        help='use detect bbox',
-                        action='store_true')
-    parser.add_argument('--flip-test',
-                        help='use flip test',
-                        action='store_true')
     parser.add_argument('--post-process',
                         help='use post process',
                         action='store_true')
-    parser.add_argument('--shift-heatmap',
-                        help='shift heatmap',
-                        action='store_true')
-    parser.add_argument('--coco-bbox-file',
-                        help='coco detection bbox file',
+    parser.add_argument('--im-file',
+                        help='input file',
                         type=str)
 
     args = parser.parse_args()
@@ -85,24 +70,17 @@ def parse_args():
 
 
 def reset_config(config, args):
-    if args.frequent:
-        config.PRINT_FREQ = args.frequent
     if args.gpus:
         config.GPUS = args.gpus
-    if args.workers:
-        config.WORKERS = args.workers
-    if args.use_detect_bbox:
-        config.TEST.USE_GT_BBOX = not args.use_detect_bbox
-    if args.flip_test:
-        config.TEST.FLIP_TEST = args.flip_test
     if args.post_process:
         config.TEST.POST_PROCESS = args.post_process
-    if args.shift_heatmap:
-        config.TEST.SHIFT_HEATMAP = args.shift_heatmap
     if args.model_file:
         config.TEST.MODEL_FILE = args.model_file
-    if args.coco_bbox_file:
-        config.TEST.COCO_BBOX_FILE = args.coco_bbox_file
+    if args.im_file:
+        config.TEST.IM_FILE = args.im_file
+
+from core.inference import inference
+from utils.vis import save_debug_images
 
 def main():
     args = parse_args()
@@ -134,32 +112,20 @@ def main():
 
     gpus = [int(i) for i in config.GPUS.split(',')]
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
-
-    # define loss function (criterion) and optimizer
-    criterion = JointsMSELoss(
-        use_target_weight=config.LOSS.USE_TARGET_WEIGHT
-    ).cuda()
+    # switch to evaluate mode
+    model.eval()
 
     # Data loading code
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    valid_dataset = eval('dataset.'+config.DATASET.DATASET)(
-        config,
-        config.DATASET.ROOT,
-        config.DATASET.TEST_SET,
-        False,
-        transforms.Compose([
-            transforms.ToTensor(),
-            normalize,
-        ])
-    )
-    valid_loader = torch.utils.data.DataLoader(
-        valid_dataset,
-        batch_size=config.TEST.BATCH_SIZE*len(gpus),
-        shuffle=False,
-        num_workers=config.WORKERS,
-        pin_memory=True
-    )
+    im = cv2.imread(args.im_file)
+
+    input = im
+    # compute output
+    output = model(input)
+
+    preds, maxvals = inference(config, model(input).cpu().numpy())
+
+    save_debug_images(config, input, meta, target, pred*4, output, './')
+
 
     # evaluate on validation set
     validate(config, valid_loader, valid_dataset, model, criterion,

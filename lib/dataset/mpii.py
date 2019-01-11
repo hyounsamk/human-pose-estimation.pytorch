@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class MPIIDataset(JointsDataset):
     def __init__(self, cfg, root, image_set, is_train, transform=None):
-        super().__init__(cfg, root, image_set, is_train, transform)
+        super(MPIIDataset, self).__init__(cfg, root, image_set, is_train, transform)
 
         self.num_joints = 16
         self.flip_pairs = [[0, 5], [1, 4], [2, 3], [10, 15], [11, 14], [12, 13]]
