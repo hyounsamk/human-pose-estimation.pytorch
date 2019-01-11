@@ -157,7 +157,7 @@ class COCODataset(JointsDataset):
         rec = []
         for obj in objs:
             cls = self._coco_ind_to_class_ind[obj['category_id']]
-            if cls != 1:
+            if cls != 1: # category_id == 1 <== person
                 continue
 
             # ignore objs without keypoints annotation

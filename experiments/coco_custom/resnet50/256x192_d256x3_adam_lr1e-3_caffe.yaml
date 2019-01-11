@@ -15,7 +15,8 @@ DATASET:
   SCALE_FACTOR: 0.3
 MODEL:
   NAME: 'pose_resnet'
-  PRETRAINED: 'models/pytorch/imagenet/resnet50-19c8e357.pth'
+  PRETRAINED: 'models/pytorch/imagenet/resnet50-caffe.pth.tar'
+  STYLE: 'caffe'
   IMAGE_SIZE:
   - 192
   - 256
@@ -58,7 +59,7 @@ TRAIN:
   MOMENTUM: 0.9
   NESTEROV: false
 TEST:
-  BATCH_SIZE: 1
+  BATCH_SIZE: 32
   COCO_BBOX_FILE: 'data/coco_custom/person_detection_results/COCO_val2017_detections_AP_H_56_person.json'
   BBOX_THRE: 1.0
   FLIP_TEST: false

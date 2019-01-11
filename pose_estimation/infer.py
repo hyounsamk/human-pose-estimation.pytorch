@@ -1,3 +1,4 @@
+# coding=utf-8
 # ------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
@@ -27,16 +28,11 @@ from core.config import config
 from core.config import update_config
 from core.config import update_dir
 from core.loss import JointsMSELoss
-from core.function import validate
 from utils.utils import create_logger
 
 import dataset
 import models
 
-def default_args():
-    return {
-        "": ""
-    }
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train keypoints network')
@@ -51,18 +47,30 @@ def parse_args():
     update_config(args.cfg)
 
     # training
+    parser.add_argument('--frequent',
+                        help='frequency of logging',
+                        default=config.PRINT_FREQ,
+                        type=int)
     parser.add_argument('--gpus',
                         help='gpus',
                         type=str)
     parser.add_argument('--model-file',
                         help='model state file',
                         type=str)
+    """
+    parser.add_argument('--use-detect-bbox',
+                        help='use detect bbox',
+                        action='store_true')
     parser.add_argument('--post-process',
                         help='use post process',
                         action='store_true')
-    parser.add_argument('--im-file',
-                        help='input file',
+    parser.add_argument('--shift-heatmap',
+                        help='shift heatmap',
+                        action='store_true')
+    parser.add_argument('--coco-bbox-file',
+                        help='coco detection bbox file',
                         type=str)
+    """
 
     args = parser.parse_args()
 
@@ -70,23 +78,91 @@ def parse_args():
 
 
 def reset_config(config, args):
+    if args.frequent:
+        config.PRINT_FREQ = args.frequent
     if args.gpus:
         config.GPUS = args.gpus
-    if args.post_process:
-        config.TEST.POST_PROCESS = args.post_process
     if args.model_file:
         config.TEST.MODEL_FILE = args.model_file
-    if args.im_file:
-        config.TEST.IM_FILE = args.im_file
+    """
+    if args.use_detect_bbox:
+        config.TEST.USE_GT_BBOX = not args.use_detect_bbox
+    if args.post_process:
+        config.TEST.POST_PROCESS = args.post_process
+    if args.shift_heatmap:
+        config.TEST.SHIFT_HEATMAP = args.shift_heatmap
+    if args.coco_bbox_file:
+        config.TEST.COCO_BBOX_FILE = args.coco_bbox_file
+    """
 
-from core.inference import inference
+import time
+import numpy as np
+
+from core.inference import get_max_preds
+from core.inference import get_final_preds
 from utils.vis import save_debug_images
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count if self.count != 0 else 0
+
+def evaluate(config, data_loader, model, output_dir, logger):
+    batch_time = AverageMeter()
+
+    # switch to evaluate mode
+    model.eval()
+    #meta = {}
+    with torch.no_grad():
+        end = time.time()
+        for i, (input, _, __, meta) in enumerate(data_loader):
+            # compute output
+            output = model(input)
+
+            pred, maxvals = get_max_preds(output.cpu().numpy())
+            # pred는 각 포인트들의 좌표값(x, y) array이다. array size는 dataset마다 차이가 있다.
+            # maxvals는 각 포인트들의 confidence(0과 1사이)값 array이다. pred의 같은 갯수이다.
+
+            maxvals = np.round_(maxvals) # 0.5 이상은 1로 반올림. 
+            meta['joints_vis'] = maxvals # 1인 포인트만 표시한다.
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % config.PRINT_FREQ == 0:
+                msg = 'Test: [{0}/{1}]\t' \
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})' \
+                        .format(i, len(data_loader), batch_time=batch_time)
+                logger.info(msg)
+
+                prefix = '{}_{}'.format(os.path.join(output_dir, 'val'), i)
+                save_debug_images(config, input, meta, None, pred*4, None, prefix)
+
+            # 각 포인트들의 최종 좌표값들을 가져온다.
+            # 최종 좌표값은 ...
+            c = meta['center'].numpy()
+            s = meta['scale'].numpy()
+            pred, maxvals = get_final_preds(config, output.cpu().numpy(), c, s)
+
 
 def main():
     args = parse_args()
     reset_config(config, args)
 
-    logger, final_output_dir, tb_log_dir = create_logger(
+    logger, final_output_dir, _ = create_logger(
         config, args.cfg, 'valid')
 
     logger.info(pprint.pformat(args))
@@ -112,24 +188,31 @@ def main():
 
     gpus = [int(i) for i in config.GPUS.split(',')]
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
-    # switch to evaluate mode
-    model.eval()
 
     # Data loading code
-    im = cv2.imread(args.im_file)
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    valid_dataset = eval('dataset.'+config.DATASET.DATASET)(
+        config,
+        config.DATASET.ROOT,
+        config.DATASET.TEST_SET,
+        False,
+        transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])
+    )
 
-    input = im
-    # compute output
-    output = model(input)
+    data_loader = torch.utils.data.DataLoader(
+        valid_dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=0,
+        pin_memory=True
+    )
 
-    preds, maxvals = inference(config, model(input).cpu().numpy())
-
-    save_debug_images(config, input, meta, target, pred*4, output, './')
-
-
-    # evaluate on validation set
-    validate(config, valid_loader, valid_dataset, model, criterion,
-             final_output_dir, tb_log_dir)
+    # evaluate
+    evaluate(config, data_loader, model, final_output_dir, logger)
 
 
 if __name__ == '__main__':
