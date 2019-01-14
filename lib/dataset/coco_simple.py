@@ -136,7 +136,7 @@ class COCOSimpleDataset(Dataset):
             y1 = np.max((0, y))
             x2 = np.min((width - 1, x1 + np.max((0, w - 1))))
             y2 = np.min((height - 1, y1 + np.max((0, h - 1))))
-            if obj['area'] > 0 and x2 >= x1 and y2 >= y1:
+            if x2 >= x1 and y2 >= y1:
                 # obj['clean_bbox'] = [x1, y1, x2, y2]
                 obj['clean_bbox'] = [x1, y1, x2-x1, y2-y1]
                 center, scale = self._box2cs(obj['clean_bbox'][:4])
