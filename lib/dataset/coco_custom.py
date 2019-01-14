@@ -26,7 +26,7 @@ from nms.nms import oks_nms
 logger = logging.getLogger(__name__)
 
 
-class COCODataset(JointsDataset):
+class COCOCustomDataset(JointsDataset):
     '''
     "keypoints": {
         0: "nose",
@@ -52,7 +52,7 @@ class COCODataset(JointsDataset):
         [7,9],[8,10],[9,11],[2,3],[1,2],[1,3],[2,4],[3,5],[4,6],[5,7]]
     '''
     def __init__(self, cfg, root, image_set, is_train, transform=None):
-        super(COCODataset, self).__init__(cfg, root, image_set, is_train, transform)
+        super(COCOCustomDataset, self).__init__(cfg, root, image_set, is_train, transform)
         self.nms_thre = cfg.TEST.NMS_THRE
         self.image_thre = cfg.TEST.IMAGE_THRE
         self.oks_thre = cfg.TEST.OKS_THRE
