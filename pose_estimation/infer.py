@@ -33,6 +33,14 @@ from utils.utils import create_logger
 import dataset
 import models
 
+def default_args(args):
+    if not args:
+        args = {}
+    args["frequent"] = 50
+    args["workers"] = 0
+    args["cfg"] = "experiments/coco_custom/resnet152/384x288_d256x3_adam_lr1e-3.yaml"
+    args["model_file"] = "models/pytorch/pose_coco/pose_resnet_152_384x288.pth.tar"
+    return args
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train keypoints network')
@@ -57,6 +65,11 @@ def parse_args():
     parser.add_argument('--model-file',
                         help='model state file',
                         type=str)
+    parser.add_argument('--workers',
+                        help='num of dataloader workers',
+                        default=0,
+                        type=int)
+
     parser.add_argument('--DEBUG',
                         help='enable/disable debug',
                         default='FALSE',
@@ -106,7 +119,9 @@ def reset_config(config, args):
         config.GPUS = args.gpus
     if args.model_file:
         config.TEST.MODEL_FILE = args.model_file
-    # debug options    
+    if args.workers:
+        config.WORKERS = args.workers
+    # debug options
     if args.DEBUG:
         config.DEBUG.DEBUG = arg2bool(args.DEBUG)
     if args.DEBUG_SAVE_BATCH_IMAGES_GT:
@@ -152,49 +167,11 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count if self.count != 0 else 0
 
-def evaluate(config, data_loader, model, output_dir, logger):
-    batch_time = AverageMeter()
-
-    # switch to evaluate mode
-    model.eval()
-    #meta = {}
-    with torch.no_grad():
-        end = time.time()
-        for i, (input, _, __, meta) in enumerate(data_loader):
-            # compute output
-            output = model(input)
-
-            if config.DEBUG.DEBUG:
-                pred, maxvals = get_max_preds(output.cpu().numpy())
-                # pred는 각 포인트들의 좌표값(x, y) array이다. array size는 dataset마다 차이가 있다.
-                # maxvals는 각 포인트들의 confidence(0과 1사이)값 array이다. pred의 같은 갯수이다.
-
-                maxvals = np.round_(maxvals) # 0.5 이상은 1로 반올림. 
-                meta['joints_vis'] = maxvals # visualization 시에는 값이 1인 포인트만 표시한다.
-
-                # 각 포인트들의 최종 좌표값들을 가져온다.
-                # 최종 좌표값은 ...
-                c = meta['center'].numpy()
-                s = meta['scale'].numpy()
-                pred, maxvals = get_final_preds(config, output.cpu().numpy(), c, s)
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if i % config.PRINT_FREQ == 0:
-                msg = 'Test: [{0}/{1}]\t' \
-                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})' \
-                        .format(i, len(data_loader), batch_time=batch_time)
-                logger.info(msg)
-                if config.DEBUG.DEBUG:
-                    prefix = '{}_{}'.format(os.path.join(output_dir, 'val'), i)
-                    save_debug_images(config, input, meta, None, pred*4, None, prefix)
-
-
-def main():
-    args = parse_args()
+def load_model(args):
     reset_config(config, args)
+
+    assert config.TEST.MODEL_FILE != None, \
+        'args.model_file should be specified!!!'
 
     logger, final_output_dir, _ = create_logger(
         config, args.cfg, 'valid')
@@ -211,22 +188,80 @@ def main():
         config, is_train=False
     )
 
-    if config.TEST.MODEL_FILE:
-        logger.info('=> loading model from {}'.format(config.TEST.MODEL_FILE))
-        model.load_state_dict(torch.load(config.TEST.MODEL_FILE))
-    else:
-        model_state_file = os.path.join(final_output_dir,
-                                        'final_state.pth.tar')
-        logger.info('=> loading model from {}'.format(model_state_file))
-        model.load_state_dict(torch.load(model_state_file))
+    logger.info('=> loading model from {}'.format(config.TEST.MODEL_FILE))
+    model.load_state_dict(torch.load(config.TEST.MODEL_FILE))
 
     gpus = [int(i) for i in config.GPUS.split(',')]
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
+    return config, model, gpus, logger, final_output_dir
+
+
+def evaluate(config, data_loader, dataset, model, output_dir, logger):
+    batch_time = AverageMeter()
+
+    # switch to evaluate mode
+    model.eval()
+
+    num_samples = len(dataset)
+    all_preds = np.zeros((num_samples, config.MODEL.NUM_JOINTS, 3),
+                         dtype=np.float32)
+    #all_boxes = np.zeros((num_samples, 6))
+    #meta = {}
+    idx = 0
+    with torch.no_grad():
+        end = time.time()
+        for i, (input, _, __, meta) in enumerate(data_loader):
+            # compute output
+            output = model(input)
+
+            num_images = input.size(0)
+            if config.DEBUG.DEBUG:
+                dbg_pred, dbg_maxvals = get_max_preds(output.cpu().numpy())
+                # pred는 각 포인트들의 좌표값(x, y) array이다. array size는 dataset마다 차이가 있다.
+                # maxvals는 각 포인트들의 confidence(0과 1사이)값 array이다. pred의 같은 갯수이다.
+
+                dbg_maxvals = np.round_(dbg_maxvals) # 0.5 이상은 1로 반올림. 
+                meta['joints_vis'] = dbg_maxvals # visualization 시에는 값이 1인 포인트만 표시한다.
+
+            # 각 포인트들의 최종 좌표값들을 가져온다.
+            # 최종 좌표값은 ...
+            c = meta['center'].numpy()
+            s = meta['scale'].numpy()
+            #preds, maxvals = get_final_preds(config, output.clone().cpu().numpy(), c, s)
+            preds, maxvals = get_final_preds(config, output.cpu().numpy(), c, s)
+
+            # 반환할 all_preds list에 저장한다.
+            # 각 point 별 좌표와 confidence value [x, y, confidence]
+            all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
+            all_preds[idx:idx + num_images, :, 2:3] = maxvals
+            idx += num_images
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % config.PRINT_FREQ == 0:
+                msg = 'Test: [{0}/{1}]\t' \
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})' \
+                        .format(i, len(data_loader), batch_time=batch_time)
+                logger.info(msg)
+                if config.DEBUG.DEBUG:
+                    prefix = '{}_{}'.format(os.path.join(output_dir, 'val'), i)
+                    save_debug_images(config, input, meta, None, dbg_pred*4, None, prefix)
+
+    return all_preds
+
+
+def main():
+    args = parse_args()
+
+    config, model, gpus, logger, final_output_dir = load_model(args)
+
     # Data loading code
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
-    valid_dataset = eval('dataset.'+config.DATASET.DATASET)(
+    dataset = eval('dataset.'+config.DATASET.DATASET)(
         config,
         config.DATASET.ROOT,
         config.DATASET.TEST_SET,
@@ -238,15 +273,25 @@ def main():
     )
 
     data_loader = torch.utils.data.DataLoader(
-        valid_dataset,
-        batch_size=1,
+        dataset,
+        batch_size=config.TEST.BATCH_SIZE*len(gpus),
         shuffle=False,
-        num_workers=0,
+        num_workers=config.WORKERS,
         pin_memory=True
     )
 
     # evaluate
-    evaluate(config, data_loader, model, final_output_dir, logger)
+    all_preds = evaluate(config, data_loader, dataset, model, final_output_dir, logger)
+
+    # 예측된 결과를 포함한다.
+    print(all_preds.shape)
+    # print(all_preds)
+    for i, pred in enumerate(all_preds):
+        if i > 10: break
+        print('%02d predection result: ' % i)
+        for j, point in enumerate(pred):
+            if point[2] < 0.7: continue # confidence가 0.7 이상인 경우만 프린트 한다.
+            print('\t %02d) x: %6.2f, y: %6.2f, confidence: %.3f' % (j, point[0], point[1], point[2]))
 
 
 if __name__ == '__main__':

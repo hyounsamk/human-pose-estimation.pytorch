@@ -40,13 +40,20 @@ python pose_estimation/valid.py \
 # coco_custom resnet_50_256x192
 python pose_estimation/infer.py \
     --frequent 1 \
+    --DEBUG TRUE \
+    --DEBUG_SAVE_BATCH_IMAGES_PRED TRUE \
     --cfg experiments/coco_custom/resnet50/256x192_d256x3_adam_lr1e-3.yaml \
     --model-file models/pytorch/pose_coco/pose_resnet_50_256x192.pth.tar
-# coco_custom resnet_152_384x288
+# coco_custom resnet_152_384x288 without debug
 python pose_estimation/infer.py \
     --frequent 1 \
     --cfg experiments/coco_custom/resnet152/384x288_d256x3_adam_lr1e-3.yaml \
     --model-file models/pytorch/pose_coco/pose_resnet_152_384x288.pth.tar
+# coco_custom resnet_50_256x192 without debug
+python pose_estimation/infer.py \
+    --frequent 1 \
+    --cfg experiments/coco_custom/resnet50/256x192_d256x3_adam_lr1e-3.yaml \
+    --model-file models/pytorch/pose_coco/pose_resnet_50_256x192.pth.tar
 
 # coco resnet_50_256x192
 python pose_estimation/infer.py \
