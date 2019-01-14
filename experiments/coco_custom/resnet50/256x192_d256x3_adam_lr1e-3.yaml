@@ -8,8 +8,7 @@ PRINT_FREQ: 100
 DATASET:
   DATASET: 'coco_custom'
   ROOT: 'data/coco_custom/'
-  TEST_SET: 'val2017'
-  TRAIN_SET: 'train2017'
+  TEST_SET: 'images'
   FLIP: true
   ROT_FACTOR: 40
   SCALE_FACTOR: 0.3
@@ -59,6 +58,7 @@ TRAIN:
   NESTEROV: false
 TEST:
   BATCH_SIZE: 1
+  COCO_KPS_FILE: 'data/coco_custom/annotations/person_keypoints.json'
   COCO_BBOX_FILE: 'data/coco_custom/person_detection_results/COCO_val2017_detections_AP_H_56_person.json'
   BBOX_THRE: 1.0
   FLIP_TEST: false
@@ -67,7 +67,7 @@ TEST:
   MODEL_FILE: ''
   NMS_THRE: 1.0
   OKS_THRE: 0.9
-  USE_GT_BBOX: true
+  USE_GT_BBOX: false
 DEBUG:
   DEBUG: true
   SAVE_BATCH_IMAGES_PRED: true

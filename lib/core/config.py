@@ -113,6 +113,7 @@ config.TEST.USE_GT_BBOX = False
 config.TEST.OKS_THRE = 0.5
 config.TEST.IN_VIS_THRE = 0.0
 config.TEST.COCO_BBOX_FILE = ''
+config.TEST.COCO_KPS_FILE = ''
 config.TEST.BBOX_THRE = 1.0
 config.TEST.MODEL_FILE = ''
 config.TEST.IMAGE_THRE = 0.0

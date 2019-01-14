@@ -63,7 +63,8 @@ class COCOCustomDataset(JointsDataset):
         self.image_height = cfg.MODEL.IMAGE_SIZE[1]
         self.aspect_ratio = self.image_width * 1.0 / self.image_height
         self.pixel_std = 200
-        self.coco = COCO(self._get_ann_file_keypoint())
+        self.coco = COCO(cfg.TEST.COCO_KPS_FILE \
+          if cfg.TEST.COCO_KPS_FILE else self._get_ann_file_keypoint())
 
         # deal with class names
         cats = [cat['name']
@@ -222,7 +223,7 @@ class COCOCustomDataset(JointsDataset):
         data_name = prefix + '.zip@' if self.data_format == 'zip' else prefix
 
         image_path = os.path.join(
-            self.root, 'images', data_name, file_name)
+            self.root, data_name, file_name)
 
         return image_path
 
