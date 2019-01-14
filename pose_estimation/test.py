@@ -197,13 +197,13 @@ def load_model(args):
     return config, model, gpus, logger, final_output_dir
 
 
-def evaluate(config, data_loader, dataset, model, output_dir, logger):
+def evaluate(config, data_loader, data_set, model, output_dir, logger):
     batch_time = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
 
-    num_samples = len(dataset)
+    num_samples = len(data_set)
     all_preds = np.zeros((num_samples, config.MODEL.NUM_JOINTS, 3),
                          dtype=np.float32)
     #all_boxes = np.zeros((num_samples, 6))
@@ -261,7 +261,7 @@ def main():
     # Data loading code
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
-    dataset = eval('dataset.'+config.DATASET.DATASET)(
+    data_set = eval('dataset.'+config.DATASET.DATASET)(
         config,
         config.DATASET.ROOT,
         config.DATASET.TEST_SET,
@@ -273,7 +273,7 @@ def main():
     )
 
     data_loader = torch.utils.data.DataLoader(
-        dataset,
+        data_set,
         batch_size=config.TEST.BATCH_SIZE*len(gpus),
         shuffle=False,
         num_workers=config.WORKERS,
@@ -281,7 +281,7 @@ def main():
     )
 
     # evaluate
-    all_preds = evaluate(config, data_loader, dataset, model, final_output_dir, logger)
+    all_preds = evaluate(config, data_loader, data_set, model, final_output_dir, logger)
 
     # 예측된 결과를 포함한다.
     print(all_preds.shape)
