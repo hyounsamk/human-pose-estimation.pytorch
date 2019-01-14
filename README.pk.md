@@ -71,3 +71,26 @@ python pose_estimation/test.py \
     --model-file models/pytorch/pose_coco/pose_resnet_50_256x192.pth.tar
 
 ```
+
+## Inference
+
+```sh
+# resnet_50_256x192
+python pose_estimation/infer_coco_simple.py \
+    --frequent 1 \
+    --DEBUG TRUE \
+    --DEBUG_SAVE_BATCH_IMAGES_PRED TRUE \
+    --dataset-dir data/coco_simple/images \
+    --coco-kps-file data/coco_simple/annotations/person_keypoints.json \
+    --cfg resnet50/256x192_d256x3_adam_lr1e-3.yaml \
+    --model pose_resnet_50_256x192.pth.tar
+
+# resnet_50_256x192 without DEBUG
+python pose_estimation/infer_coco_simple.py \
+    --frequent 1 \
+    --dataset-dir data/coco_simple/images \
+    --coco-kps-file data/coco_simple/annotations/person_keypoints.json \
+    --cfg resnet50/256x192_d256x3_adam_lr1e-3.yaml \
+    --model pose_resnet_50_256x192.pth.tar
+
+```
