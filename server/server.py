@@ -8,10 +8,24 @@ import json
 DOC_ROOT = './public'
 PORT_NUMBER = 8080
 
-def ensure_list_type(obj):
-    if isinstance(obj, set):
-        return list(obj)
-    raise TypeError('Shoud be list type but, ' + type(obj).__name__)
+from pose_estimation.infer_coco_simple import init_model, load_model, infer, release_model
+
+model = None
+def _prepare_model():
+  global model
+  if model:
+    return
+  _ = init_model()
+  model = load_model()
+
+def _release_model():
+  global model
+  if not model:
+    return
+  del model
+  model = None
+  release_model()
+
 
 #This class will handles any incoming request from
 #the browser 
@@ -23,6 +37,7 @@ class myHandler(BaseHTTPRequestHandler):
 
     #Check the file extension required and
     #set the right mime type
+    msg = None
     if self.path.endswith(".html"):
       mimetype='text/html'
     elif self.path.endswith(".jpg"):
@@ -34,19 +49,29 @@ class myHandler(BaseHTTPRequestHandler):
     elif self.path.endswith(".css"):
       mimetype='text/css'
     else:
-      return # invalid request
+      if self.path == '/closepose':
+        _release_model()
+        msg = 'released...'
+      else:
+        return # invalid request
 
-    # serve file
-    try:
-      #Open the static file requested and send it
-      f = open(DOC_ROOT + self.path) 
+    if msg:
       self.send_response(200)
-      self.send_header('Content-type',mimetype)
+      self.send_header('Content-type', 'text')
       self.end_headers()
-      self.wfile.write(f.read())
-      f.close()
-    except IOError:
-      self.send_error(404,'File Not Found: %s' % self.path)
+      self.wfile.write(msg)
+    else:
+      # serve file
+      try:
+        #Open the static file requested and send it
+        f = open(DOC_ROOT + self.path) 
+        self.send_response(200)
+        self.send_header('Content-type',mimetype)
+        self.end_headers()
+        self.wfile.write(f.read())
+        f.close()
+      except IOError:
+        self.send_error(404,'File Not Found: %s' % self.path)
 
   #Handler for the POST requests
   def do_POST(self):
@@ -59,8 +84,9 @@ class myHandler(BaseHTTPRequestHandler):
 
     if self.path=="/getpose":
       print("Data type is: %s" % form["data_type"].value)
-
-      all_preds = infer(args.dataset_dir, args.coco_kps_file, model)
+      data_path = form["data_path"].value
+      _prepare_model()
+      all_preds = infer(path.dirname(data_path), data_path, model)
 
       # send response
       self.send_response(200)
@@ -68,15 +94,12 @@ class myHandler(BaseHTTPRequestHandler):
       self.end_headers()
       self.wfile.write(json.dumps({
         'status': 200,
-        'message': "Thanks for request with %s!" % form["data_type"].value,
+        'message': "request with %s!" % form["data_type"].value,
         'result': all_preds.tolist()
       }))
       return
 
-from pose_estimation.infer_coco_simple import init_model, load_model, infer
-
-args = init_model()
-model = load_model()
+_prepare_model()
 
 try:
   DOC_ROOT = path.join(path.dirname(path.realpath(__file__)), DOC_ROOT)

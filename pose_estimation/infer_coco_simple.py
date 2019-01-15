@@ -17,8 +17,6 @@ import cv2
 
 import torch
 import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
@@ -60,13 +58,18 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count if self.count != 0 else 0
 
-default_config_file = 'resnet152/384x288_d256x3_adam_lr1e-3.yaml'
-default_model_file = 'pose_resnet_152_384x288.pth.tar'
+#default_config_file = 'resnet152/384x288_d256x3_adam_lr1e-3.yaml'
+#default_model_file = 'pose_resnet_152_384x288.pth.tar'
+default_config_file = 'resnet50/256x192_d256x3_adam_lr1e-3.yaml'
+default_model_file = 'pose_resnet_50_256x192.pth.tar'
 
 default_dataset_dir = 'data/coco_simple/samples'
 default_kps_file = 'data/coco_simple/samples/person_keypoints.json'
 
 def _init_logger(args):
+    global logger
+    if logger:
+        return
     _logger, final_output_dir, _ = create_logger(
         config, args.cfg, 'infer_coco') 
     _logger.info(pprint.pformat(args))
@@ -74,7 +77,6 @@ def _init_logger(args):
 
     # update OUTPUT_DIR
     config.OUTPUT_DIR = final_output_dir
-    global logger
     logger = _logger
 
 def init_model(config_file=None):
@@ -95,8 +97,8 @@ def load_model():
         'args.model should be specified!!!'
 
     # cudnn related setting
-    cudnn.benchmark = config.CUDNN.BENCHMARK
-    torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
+    #cudnn.benchmark = config.CUDNN.BENCHMARK
+    #torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
 
     model = eval('models.'+config.MODEL.NAME+'.get_pose_net')(
@@ -110,6 +112,9 @@ def load_model():
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
     return model
+
+def release_model():
+    torch.cuda.empty_cache()
 
 def evaluate(data_loader, data_set, model):
     batch_time = AverageMeter()
