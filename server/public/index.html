@@ -1,0 +1,33 @@
+<html>
+<body>
+  <form method="POST" action="/getpose">
+    <label for="data_type">Select data type: </label>
+    <select name="data_type" id="data_type" onchange="on_data_select_change()">
+      <option value="path" selected>path</option>
+      <!-- <option value="file">file</option> -->    
+      </select><br/><br/>
+    <input value="data/000000069213.jpg" type="input" name="data_path" id="data_path" placeholder="image file path">
+    <input type="file" name="data_file" id="data_file"> <br/>
+    <hr/>
+    <input type="submit" value="submit">
+  </form>
+
+  <script>
+    function on_data_select_change() {
+      var dataType = document.getElementById("data_type").value;
+      if (dataType === 'path') {
+        document.getElementById("data_path").style.display = 'block';
+        document.getElementById("data_file").style.display = 'none';
+      }
+      else if (dataType === 'file') {
+        document.getElementById("data_path").style.display = 'none';
+        document.getElementById("data_file").style.display = 'block';
+      }
+    }
+    // init onload
+    (function on_load() {
+      on_data_select_change();
+    })();
+  </script>
+</body>
+</html>

@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 '''
 
 class COCOSimpleDataset(Dataset):
-    def __init__(self, cfg, root, transform):
+    def __init__(self, cfg, root, kps_file, transform):
         self.root = root
         self.image_size = cfg.MODEL.IMAGE_SIZE
         self.transform = transform
@@ -65,7 +65,7 @@ class COCOSimpleDataset(Dataset):
         self.image_height = cfg.MODEL.IMAGE_SIZE[1]
         self.aspect_ratio = self.image_width * 1.0 / self.image_height
         self.pixel_std = 200
-        self.coco = COCO(cfg.TEST.COCO_KPS_FILE)
+        self.coco = COCO(kps_file)
 
         # deal with class names
         cats = [cat['name']
