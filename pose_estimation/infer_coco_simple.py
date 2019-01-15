@@ -60,7 +60,11 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count if self.count != 0 else 0
 
-default_config_file='resnet152/384x288_d256x3_adam_lr1e-3.yaml'
+default_config_file = 'resnet152/384x288_d256x3_adam_lr1e-3.yaml'
+default_model_file = 'pose_resnet_152_384x288.pth.tar'
+
+default_dataset_dir = 'data/coco_simple/samples'
+default_kps_file = 'data/coco_simple/samples/person_keypoints.json'
 
 def _init_logger(args):
     _logger, final_output_dir, _ = create_logger(
@@ -171,9 +175,9 @@ def infer(dataset_dir, coco_kps_file, model):
 
 def load_data(dataset_dir=None, kps_file=None):
     if not dataset_dir:
-        dataset_dir = "data/coco_simple/samples"
+        dataset_dir = default_dataset_dir
     if not kps_file:
-        kps_file = "data/coco_simple/samples/person_keypoints.json"
+        kps_file = default_kps_file
 
     # Data loading code
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -221,7 +225,7 @@ def _parse_args(config_file=None):
                         type=str)
     parser.add_argument('--model',
                         help='model state file',
-                        default="pose_resnet_152_384x288.pth.tar",
+                        default=default_model_file,
                         type=str)
 
     parser.add_argument('--dataset-dir',
@@ -256,12 +260,14 @@ def _parse_args(config_file=None):
                         help='SAVE_HEATMAPS_PRED',
                         default='FALSE',
                         type=str)
+
+    parser.add_argument('--post-process',
+                        help='use post process',
+                        default='TRUE',
+                        action='store_true')
     """
     parser.add_argument('--use-detect-bbox',
                         help='use detect bbox',
-                        action='store_true')
-    parser.add_argument('--post-process',
-                        help='use post process',
                         action='store_true')
     parser.add_argument('--shift-heatmap',
                         help='shift heatmap',
@@ -300,6 +306,8 @@ def _reset_config(args):
         config.DEBUG.SAVE_HEATMAPS_GT = _arg2bool(args.DEBUG_SAVE_HEATMAPS_GT)
     if args.DEBUG_SAVE_HEATMAPS_PRED:
         config.DEBUG.SAVE_HEATMAPS_PRED = _arg2bool(args.DEBUG_SAVE_HEATMAPS_PRED)
+    if args.post_process:
+        config.TEST.POST_PROCESS = _arg2bool(args.post_process)
     """
     if args.use_detect_bbox:
         config.TEST.USE_GT_BBOX = not args.use_detect_bbox

@@ -10,21 +10,14 @@ from __future__ import print_function
 
 import logging
 import os
-import pickle
 import copy
 import cv2
 
-from collections import defaultdict
-from collections import OrderedDict
 from torch.utils.data import Dataset
 
-import json_tricks as json
 import numpy as np
 from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
 
-#from dataset.JointsDataset import JointsDataset
-from nms.nms import oks_nms
 from utils.transforms import get_affine_transform
 
 
@@ -67,27 +60,10 @@ class COCOSimpleDataset(Dataset):
         self.pixel_std = 200
         self.coco = COCO(kps_file)
 
-        # deal with class names
-        cats = [cat['name']
-                for cat in self.coco.loadCats(self.coco.getCatIds())]
-        self.classes = ['__background__'] + cats
-        logger.info('=> classes: {}'.format(self.classes))
-        self.num_classes = len(self.classes)
-        self._class_to_ind = dict(zip(self.classes, range(self.num_classes)))
-        self._class_to_coco_ind = dict(zip(cats, self.coco.getCatIds()))
-        self._coco_ind_to_class_ind = dict([(self._class_to_coco_ind[cls],
-                                             self._class_to_ind[cls])
-                                            for cls in self.classes[1:]])
-
         # load image file names
         self.image_set_index = self._load_image_set_index()
         self.num_images = len(self.image_set_index)
         logger.info('=> num_images: {}'.format(self.num_images))
-
-        self.num_joints = 17
-        self.flip_pairs = [[1, 2], [3, 4], [5, 6], [7, 8],
-                           [9, 10], [11, 12], [13, 14], [15, 16]]
-        self.parent_ids = None
 
         self.db = self._get_db()
 
