@@ -83,8 +83,7 @@ def init_model(config_file=None):
     # parse args and reset config
     args = _parse_args(config_file)
     _reset_config(args)
-
-    print('>>>>>>>>>>>>>>>>', args.cfg)
+    #print('>>>>>>>>>>>>>>>>', args.cfg)
 
     # logger
     _init_logger(args)
@@ -121,7 +120,6 @@ def evaluate(data_loader, data_set, model):
 
     # switch to evaluate mode
     model.eval()
-
     num_samples = len(data_set)
     all_preds = np.zeros((num_samples, config.MODEL.NUM_JOINTS, 3),
                          dtype=np.float32)
@@ -172,10 +170,11 @@ def evaluate(data_loader, data_set, model):
     return all_preds
 
 def infer(dataset_dir, coco_kps_file, model):
+    logger.info('=> infer %s, %s' % (dataset_dir, coco_kps_file))
+    # data
     data_set, data_loader = load_data(dataset_dir, coco_kps_file)
     # evaluate
     all_preds = evaluate(data_loader, data_set, model)
-
     return all_preds
 
 def load_data(dataset_dir=None, kps_file=None):
@@ -329,6 +328,7 @@ def main():
     model = load_model()
 
     all_preds = infer(args.dataset_dir, args.coco_kps_file, model)
+    #all_preds = infer('data/coco_simple/samples', 'data/coco_simple/samples/person_keypoints.json', model)
 
     print('preds shape: ', all_preds.shape)
     # print(all_preds)

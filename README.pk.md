@@ -81,7 +81,7 @@ python pose_estimation/infer_coco_simple.py \
     --DEBUG TRUE \
     --DEBUG_SAVE_BATCH_IMAGES_PRED TRUE \
     --dataset-dir data/coco_simple/images2 \
-    --coco-kps-file data/coco_simple/annotations2/person_keypoints_all.json \
+    --coco-kps-file data/coco_simple/images2/person_keypoints_all.json \
     --cfg resnet50/256x192_d256x3_adam_lr1e-3.yaml \
     --model pose_resnet_50_256x192.pth.tar
 
@@ -96,3 +96,5 @@ python pose_estimation/infer_coco_simple.py \
 python pose_estimation/infer_coco_simple.py --frequent 1
 
 ```
+
+python pose_estimation/infer_coco_simple.py --frequent 1 --DEBUG TRUE --DEBUG_SAVE_BATCH_IMAGES_PRED TRUE --dataset-dir data/coco_simple/images2 --coco-kps-file data/coco_simple/images2/person_keypoints_all.json --cfg resnet50/256x192_d256x3_adam_lr1e-3.yaml --model pose_resnet_50_256x192.pth.tar

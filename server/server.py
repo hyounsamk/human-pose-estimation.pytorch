@@ -1,11 +1,11 @@
 #!/usr/bin/python
-from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
+from http.server import BaseHTTPRequestHandler,HTTPServer
+# from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
 from os import curdir, sep, path
 import cgi
-
 import json
 
-DOC_ROOT = './public'
+DOC_ROOT = path.join(path.dirname(path.realpath(__file__)), 'public')
 PORT_NUMBER = 8080
 
 from pose_estimation.infer_coco_simple import init_model, load_model, infer, release_model
@@ -64,7 +64,7 @@ class myHandler(BaseHTTPRequestHandler):
       # serve file
       try:
         #Open the static file requested and send it
-        f = open(DOC_ROOT + self.path) 
+        f = open(DOC_ROOT + self.path, 'rb') 
         self.send_response(200)
         self.send_header('Content-type',mimetype)
         self.end_headers()
@@ -96,22 +96,31 @@ class myHandler(BaseHTTPRequestHandler):
         'status': 200,
         'message': "request with %s!" % form["data_type"].value,
         'result': all_preds.tolist()
-      }))
+      }).encode())
       return
 
-_prepare_model()
+from multiprocessing import Process, freeze_support
 
-try:
-  DOC_ROOT = path.join(path.dirname(path.realpath(__file__)), DOC_ROOT)
-  print('Doc root ', DOC_ROOT)
-  #Create a web server and define the handler to manage the
-  #incoming request
-  server = HTTPServer(('', PORT_NUMBER), myHandler)
-  print('Listening on port ' , PORT_NUMBER)
+def main():
+  _prepare_model()
+  infer(None, None, model)
 
-  #Wait forever for incoming htto requests
-  server.serve_forever()
+  try:
+    #Create a web server and define the handler to manage the
+    #incoming request
+    server = HTTPServer(('', PORT_NUMBER), myHandler)
+    print('Listening on port ' , PORT_NUMBER)
+    print('Doc root ', DOC_ROOT)
 
-except KeyboardInterrupt:
-	print('^C received, shutting down the web server')
-	server.socket.close()
+    #Wait forever for incoming htto requests
+    server.serve_forever()
+  except KeyboardInterrupt:
+    print('^C received, shutting down the web server')
+    server.socket.close()
+
+if __name__ == "__main__":
+  # Add support for when a program which uses multiprocessing has been frozen 
+  # to produce a Windows executable. 
+  freeze_support()
+  #Process(target=main).start()
+  main()
