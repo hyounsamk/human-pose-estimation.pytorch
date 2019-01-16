@@ -148,6 +148,7 @@ class COCOSimpleDataset(Dataset):
         return center, scale
 
     def __len__(self,):
+        logger.info('=> len() ')
         return len(self.db)
 
     def __getitem__(self, idx):
@@ -155,7 +156,7 @@ class COCOSimpleDataset(Dataset):
 
         image_file = db_rec['image']
         filename = db_rec['filename'] if 'filename' in db_rec else ''
-        imgnum = db_rec['imgnum'] if 'imgnum' in db_rec else ''
+        imgnum = db_rec['imgnum'] if 'imgnum' in db_rec else 0
 
         data_numpy = cv2.imread(
             image_file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)

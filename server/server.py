@@ -59,7 +59,7 @@ class myHandler(BaseHTTPRequestHandler):
       self.send_response(200)
       self.send_header('Content-type', 'text')
       self.end_headers()
-      self.wfile.write(msg)
+      self.wfile.write(msg.encode())
     else:
       # serve file
       try:
