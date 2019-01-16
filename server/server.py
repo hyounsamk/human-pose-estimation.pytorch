@@ -7,6 +7,7 @@ import json
 
 DOC_ROOT = path.join(path.dirname(path.realpath(__file__)), 'public')
 PORT_NUMBER = 8080
+DBG_LOG = False
 
 from pose_estimation.infer_coco_simple import init_model, load_model, infer, release_model
 
@@ -29,7 +30,7 @@ def _release_model():
 
 #This class will handles any incoming request from
 #the browser 
-class myHandler(BaseHTTPRequestHandler):
+class MyHandler(BaseHTTPRequestHandler):
 	#Handler for the GET requests
   def do_GET(self):
     if self.path=="/":
@@ -83,7 +84,7 @@ class myHandler(BaseHTTPRequestHandler):
       })
 
     if self.path=="/getpose":
-      print("Data type is: %s" % form["data_type"].value)
+      if DBG_LOG: print("Data type is: %s" % form["data_type"].value)
       data_path = form["data_path"].value
       _prepare_model()
       all_preds = infer(path.dirname(data_path), data_path, model)
@@ -99,7 +100,9 @@ class myHandler(BaseHTTPRequestHandler):
       }).encode())
       return
 
-from multiprocessing import Process, freeze_support
+  def log_message(self, format, *args):
+    # disable logging
+    if DBG_LOG: super(MyHandler, self).log_message(format, *args)
 
 def main():
   _prepare_model()
@@ -108,8 +111,8 @@ def main():
   try:
     #Create a web server and define the handler to manage the
     #incoming request
-    server = HTTPServer(('', PORT_NUMBER), myHandler)
-    print('Listening on port ' , PORT_NUMBER)
+    server = HTTPServer(('127.0.0.1', PORT_NUMBER), MyHandler)
+    print('Listening on port, ' , PORT_NUMBER)
     print('Doc root ', DOC_ROOT)
 
     #Wait forever for incoming htto requests
@@ -118,6 +121,7 @@ def main():
     print('^C received, shutting down the web server')
     server.socket.close()
 
+from multiprocessing import Process, freeze_support
 if __name__ == "__main__":
   # Add support for when a program which uses multiprocessing has been frozen 
   # to produce a Windows executable. 

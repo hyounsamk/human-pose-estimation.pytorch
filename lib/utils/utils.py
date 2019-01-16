@@ -19,7 +19,7 @@ import torch.optim as optim
 from core.config import get_model_name
 
 
-def create_logger(cfg, cfg_name, phase='train'):
+def create_logger(cfg, cfg_name, phase='train', debug=True):
     root_output_dir = Path(cfg.OUTPUT_DIR)
     # set up logger
     if not root_output_dir.exists():
@@ -45,9 +45,10 @@ def create_logger(cfg, cfg_name, phase='train'):
     logging.basicConfig(filename=str(final_log_file),
                         format=head)
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    console = logging.StreamHandler()
-    logging.getLogger('').addHandler(console)
+    if debug:
+        logger.setLevel(logging.INFO)
+        console = logging.StreamHandler()
+        logging.getLogger('').addHandler(console)
 
     tensorboard_log_dir = Path(cfg.LOG_DIR) / dataset / model / \
         (cfg_name + '_' + time_str)

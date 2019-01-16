@@ -41,6 +41,22 @@ from utils.vis import save_debug_images
 
 logger = None
 
+class DeltaTime(object):
+    def __init__(self):
+        self.reset()
+    def reset(self):
+        self.t0 = 0
+    def update(self):
+        self.t0 = time.time()
+    def check_(self):
+        return time.time() - self.t0
+    def lap_(self):
+        t = self.t0
+        self.t0 = time.time()
+        return self.t0 - t
+    def lap(self, prefix):
+        print(prefix, self.lap_())
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
@@ -66,12 +82,13 @@ default_model_file = 'pose_resnet_50_256x192.pth.tar'
 default_dataset_dir = 'data/coco_simple/samples'
 default_kps_file = 'data/coco_simple/samples/person_keypoints.json'
 
+
 def _init_logger(args):
     global logger
     if logger:
         return
     _logger, final_output_dir, _ = create_logger(
-        config, args.cfg, 'infer_coco') 
+        config, args.cfg, 'infer_coco', _arg2bool(args.DEBUG)) 
     _logger.info(pprint.pformat(args))
     _logger.info(pprint.pformat(config))
 
@@ -117,6 +134,8 @@ def release_model():
 
 def evaluate(data_loader, data_set, model):
     batch_time = AverageMeter()
+    _deltatime = DeltaTime()
+    _deltatime.update()
 
     # switch to evaluate mode
     model.eval()
@@ -128,9 +147,15 @@ def evaluate(data_loader, data_set, model):
     idx = 0
     with torch.no_grad():
         end = time.time()
+        _deltatime.lap("DELTA: evaluate(): start")
+        #
+        # !!! data를 로드하는 시간이 1.4초정도 소요됨
+        # 원인을 파악해야 함
         for i, (input, meta) in enumerate(data_loader):
-            # compute output
+            _deltatime.lap("DELTA: evaluate(): data_loader")
+        # compute output
             output = model(input)
+            _deltatime.lap("DELTA: evaluate(): model()")
 
             num_images = input.size(0)
             if config.DEBUG.DEBUG:
@@ -147,6 +172,7 @@ def evaluate(data_loader, data_set, model):
             s = meta['scale'].numpy()
             #preds, maxvals = get_final_preds(config, output.clone().cpu().numpy(), c, s)
             preds, maxvals = get_final_preds(config, output.cpu().numpy(), c, s)
+            _deltatime.lap("DELTA: evaluate(): get_final_preds()")
 
             # 반환할 all_preds list에 저장한다.
             # 각 point 별 좌표와 confidence value [x, y, confidence]
@@ -166,15 +192,21 @@ def evaluate(data_loader, data_set, model):
                 if config.DEBUG.DEBUG:
                     prefix = '{}_{}'.format(os.path.join(config.OUTPUT_DIR, 'val'), i)
                     save_debug_images(config, input, meta, None, dbg_pred*4, None, prefix)
+            _deltatime.lap("DELTA: evaluate(): done()")
 
     return all_preds
 
 def infer(dataset_dir, coco_kps_file, model):
     logger.info('=> infer %s, %s' % (dataset_dir, coco_kps_file))
+    _deltatime = DeltaTime()
+
     # data
+    _deltatime.update()
     data_set, data_loader = load_data(dataset_dir, coco_kps_file)
+    _deltatime.lap("DELTA: load_data")
     # evaluate
     all_preds = evaluate(data_loader, data_set, model)
+    _deltatime.lap("DELTA: evaluate")
     return all_preds
 
 def load_data(dataset_dir=None, kps_file=None):
@@ -182,6 +214,8 @@ def load_data(dataset_dir=None, kps_file=None):
         dataset_dir = default_dataset_dir
     if not kps_file:
         kps_file = default_kps_file
+    _deltatime = DeltaTime()
+    _deltatime.update()
 
     # Data loading code
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -195,14 +229,18 @@ def load_data(dataset_dir=None, kps_file=None):
             normalize,
         ])
     )
+    _deltatime.lap("DELTA: dataset.coco_simple")
+
     gpus = [int(i) for i in config.GPUS.split(',')]
     data_loader = torch.utils.data.DataLoader(
         data_set,
         batch_size=config.TEST.BATCH_SIZE*len(gpus),
         shuffle=False,
-        num_workers=config.WORKERS,
+        # num_workers 가 0보다 크면 data loading 시간이 현저하게 느려짐
+        num_workers=0,#config.WORKERS,
         pin_memory=True
     )
+    _deltatime.lap("DELTA: torch.utils.data.DataLoader")
 
     return data_set, data_loader
 

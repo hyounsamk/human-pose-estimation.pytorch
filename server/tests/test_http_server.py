@@ -2,6 +2,7 @@
 #!/usr/bin/python
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from os import curdir, sep, path
+import sys
 import cgi
 import json
 from multiprocessing import Process, freeze_support
@@ -95,7 +96,7 @@ def get_request(base_url, get_count):
       break
     count -= 1
     t_start = time.time()
-    res = request.urlopen('%s%s?q=%.7f#%s' % (base_url, '/path/to/get', t_start, 'fragment'))
+    res = request.urlopen('%s%s?q=%.7f#%s' % (base_url, '/path/to/get', t_start, 'fragment'), timeout=2) # 2 seconds
     if res.getcode() != 200:
       failure += 1
       print('RES code: %d' % res.getcode())
@@ -125,7 +126,7 @@ def post_request(base_url, post_count):
     headers = { "Content-type": "application/x-www-form-urlencoded", "Accept": 'application/json' }
 
     req = request.Request('%s%s' % (base_url, '/path/to/post'), data, headers)
-    res = request.urlopen(req)
+    res = request.urlopen(req, timeout=2) # 2 seconds
     if res.getcode() != 200:
       failure += 1
       print('RES code: %d' % res.getcode())
@@ -138,6 +139,41 @@ def post_request(base_url, post_count):
     #print(res)
     times.append(time.time() - t_start)
   return times, failure
+
+def post_request2(base_url, post_count):
+  # POST request
+  times = []
+  count = post_count
+  failure = 0
+  while True:
+    if count <= 0:
+      break
+    count -= 1
+
+    t_start = time.time()
+    data = { 
+      'data_type': 'path',
+      'data_path': 'data/coco_simple/images2/person_keypoints.json'
+      #'data_path': 'data/coco_simple/images2/person_keypoints_all.json'
+    }
+    data = parse.urlencode(data).encode()
+    headers = { "Content-type": "application/x-www-form-urlencoded", "Accept": 'application/json' }
+
+    req = request.Request('%s%s' % (base_url, '/getpose'), data, headers)
+    res = request.urlopen(req, timeout=5) # 5 seconds
+    if res.getcode() != 200:
+      failure += 1
+      print('RES code: %d' % res.getcode())
+    else:
+      res = res.read()
+      obj = json.loads(res.decode('utf-8'))
+      if float(obj['status']) != 200:
+        failure += 1
+        print('DIFF', obj['status'])
+    #print(res)
+    times.append(time.time() - t_start)
+  return times, failure
+
 
 def report_time(msg, times, failure):
   print('%s: failure: %d / %d' % (msg, failure, len(times)))
@@ -159,18 +195,21 @@ def start_request(get_count, post_count):
   report_time('Elapsed time for GET', times, failure)
 
   print('-----------------------')
-  times, failure = post_request(base_url, post_count)
+  times, failure = post_request2(base_url, post_count)
   report_time('Elapsed time for POST', times, failure)
 
 if __name__ == "__main__":
   # Add support for when a program which uses multiprocessing has been frozen 
   # to produce a Windows executable. 
   freeze_support()
-  Process(target=start_server).start()
-  #start_server()
 
-  time.sleep(2) # 2 seconds
-  start_request(1000, 1000)
+  # start server
+  if len(sys.argv) > 1 :
+    Process(target=start_server).start()
+    #start_server()
+    time.sleep(2) # 2 seconds
+
+  start_request(0, 1000)
 
   print('=====================')
 

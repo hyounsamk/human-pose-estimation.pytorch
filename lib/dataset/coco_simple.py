@@ -12,6 +12,7 @@ import logging
 import os
 import copy
 import cv2
+import time
 
 from torch.utils.data import Dataset
 
@@ -48,8 +49,28 @@ logger = logging.getLogger(__name__)
     [7,9],[8,10],[9,11],[2,3],[1,2],[1,3],[2,4],[3,5],[4,6],[5,7]]
 '''
 
+class DeltaTime(object):
+    def __init__(self):
+        self.reset()
+    def reset(self):
+        self.t0 = 0
+    def update(self):
+        self.t0 = time.time()
+    def check_(self):
+        return time.time() - self.t0
+    def lap_(self):
+        t = self.t0
+        self.t0 = time.time()
+        return self.t0 - t
+    def lap(self, prefix):
+        t = self.lap_()
+        #print(prefix, t)
+
 class COCOSimpleDataset(Dataset):
     def __init__(self, cfg, root, kps_file, transform):
+        #_deltatime = DeltaTime()
+        #_deltatime.update()
+
         self.root = root
         self.image_size = cfg.MODEL.IMAGE_SIZE
         self.transform = transform
@@ -59,6 +80,7 @@ class COCOSimpleDataset(Dataset):
         self.aspect_ratio = self.image_width * 1.0 / self.image_height
         self.pixel_std = 200
         self.coco = COCO(kps_file)
+        #_deltatime.lap("DELTA: COCOSimple(): COCO")
 
         # load image file names
         self.image_set_index = self._load_image_set_index()
@@ -68,22 +90,25 @@ class COCOSimpleDataset(Dataset):
         self.db = self._get_db()
 
         logger.info('=> load {} samples'.format(len(self.db)))
+        #_deltatime.lap("DELTA: COCOSimple(): INIT DONE")
 
     def _load_image_set_index(self):
         """ image id: int """
+        _deltatime = DeltaTime()
+        _deltatime.update()
         image_ids = self.coco.getImgIds()
+        _deltatime.lap("DELTA: COCOSimple(): coco.getImgIds")
         return image_ids
 
     def _get_db(self):
         # use ground truth bbox
-        gt_db = self._load_coco_keypoint_annotations()
-        return gt_db
-
-    def _load_coco_keypoint_annotations(self):
         """ ground truth bbox and keypoints """
+        _deltatime = DeltaTime()
+        _deltatime.update()
         gt_db = []
         for index in self.image_set_index:
             gt_db.extend(self._load_coco_keypoint_annotation_kernal(index))
+            _deltatime.lap("DELTA: COCOSimple(): _load_coco_keypoint_annotation_kernal")
         return gt_db
 
     def _load_coco_keypoint_annotation_kernal(self, index):
@@ -152,7 +177,11 @@ class COCOSimpleDataset(Dataset):
         return len(self.db)
 
     def __getitem__(self, idx):
+        _deltatime = DeltaTime()
+        _deltatime.update()
+
         db_rec = copy.deepcopy(self.db[idx])
+        #_deltatime.lap("DELTA: COCOSimple(): deepcopy()")
 
         image_file = db_rec['image']
         filename = db_rec['filename'] if 'filename' in db_rec else ''
@@ -160,6 +189,7 @@ class COCOSimpleDataset(Dataset):
 
         data_numpy = cv2.imread(
             image_file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
+        #_deltatime.lap("DELTA: COCOSimple(): cv2.imread()")
 
         if data_numpy is None:
             logger.error('=> fail to read {}'.format(image_file))
@@ -171,14 +201,17 @@ class COCOSimpleDataset(Dataset):
         r = 0
 
         trans = get_affine_transform(c, s, r, self.image_size)
+        #_deltatime.lap("DELTA: COCOSimple(): get_affine_transform()")
         input = cv2.warpAffine(
             data_numpy,
             trans,
             (int(self.image_size[0]), int(self.image_size[1])),
             flags=cv2.INTER_LINEAR)
+        #_deltatime.lap("DELTA: COCOSimple(): cv2.warpAffine()")
 
         if self.transform:
             input = self.transform(input)
+        #_deltatime.lap("DELTA: COCOSimple(): transform()")
 
         meta = {
             'image': image_file,
