@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from http.server import BaseHTTPRequestHandler,HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 # from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
 from os import curdir, sep, path
 import cgi
