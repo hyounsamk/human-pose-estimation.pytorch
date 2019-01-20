@@ -10,7 +10,7 @@ from urllib.parse import urlparse, parse_qs
 
 DOC_ROOT = path.join(path.dirname(path.realpath(__file__)), 'public')
 PORT_NUMBER = 8080
-DBG_LOG = False
+DBG_LOG = True
 
 class MyHandler(BaseHTTPRequestHandler):
 	# Handler for the GET requests
@@ -195,7 +195,7 @@ def start_request(get_count, post_count):
   report_time('Elapsed time for GET', times, failure)
 
   print('-----------------------')
-  times, failure = post_request2(base_url, post_count)
+  times, failure = post_request(base_url, post_count)
   report_time('Elapsed time for POST', times, failure)
 
 if __name__ == "__main__":
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     #start_server()
     time.sleep(2) # 2 seconds
 
-  start_request(0, 1000)
+  start_request(10, 10)
 
   print('=====================')
 
