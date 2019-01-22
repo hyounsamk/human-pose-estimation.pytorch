@@ -34,10 +34,11 @@ class MyHandler(BaseHTTPRequestHandler):
   def inference_request(self, data_path):
       if DBG_LOG: print("data_path: %s" % data_path)
       _prepare_model()
-      all_preds = infer(path.dirname(data_path), data_path, model)
+      all_preds, all_ids = infer(path.dirname(data_path), data_path, model)
       return {
         'status': 200,
         'message': "",
+        'ids': all_ids.tolist(),
         'result': all_preds.tolist()
       }
 

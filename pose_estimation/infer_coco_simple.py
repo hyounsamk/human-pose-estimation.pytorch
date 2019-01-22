@@ -76,8 +76,15 @@ class AverageMeter(object):
 
 #default_config_file = 'resnet152/384x288_d256x3_adam_lr1e-3.yaml'
 #default_model_file = 'pose_resnet_152_384x288.pth.tar'
-default_config_file = 'resnet50/256x192_d256x3_adam_lr1e-3.yaml'
-default_model_file = 'pose_resnet_50_256x192.pth.tar'
+
+#default_config_file = 'resnet101/384x288_d256x3_adam_lr1e-3.yaml'
+#default_model_file = 'pose_resnet_101_384x288.pth.tar'
+
+default_config_file = 'resnet101/256x192_d256x3_adam_lr1e-3.yaml'
+default_model_file = 'pose_resnet_101_256x192.pth.tar'
+
+#default_config_file = 'resnet50/256x192_d256x3_adam_lr1e-3.yaml'
+#default_model_file = 'pose_resnet_50_256x192.pth.tar'
 
 default_dataset_dir = 'data/coco_simple/samples'
 default_kps_file = 'data/coco_simple/samples/person_keypoints.json'
@@ -95,6 +102,7 @@ def _init_logger(args):
     # update OUTPUT_DIR
     config.OUTPUT_DIR = final_output_dir
     logger = _logger
+
 
 def init_model(config_file=None):
     # parse args and reset config
@@ -129,8 +137,10 @@ def load_model():
 
     return model
 
+
 def release_model():
     torch.cuda.empty_cache()
+
 
 def evaluate(data_loader, data_set, model):
     batch_time = AverageMeter()
@@ -140,6 +150,7 @@ def evaluate(data_loader, data_set, model):
     # switch to evaluate mode
     model.eval()
     num_samples = len(data_set)
+    all_ids = np.zeros(num_samples, dtype=np.int64)
     all_preds = np.zeros((num_samples, config.MODEL.NUM_JOINTS, 3),
                          dtype=np.float32)
     #all_boxes = np.zeros((num_samples, 6))
@@ -148,12 +159,9 @@ def evaluate(data_loader, data_set, model):
     with torch.no_grad():
         end = time.time()
         #_deltatime.lap("DELTA: evaluate(): start")
-        #
-        # !!! data를 로드하는 시간이 1.4초정도 소요됨
-        # 원인을 파악해야 함
         for i, (input, meta) in enumerate(data_loader):
-           # _deltatime.lap("DELTA: evaluate(): data_loader")
-        # compute output
+            # _deltatime.lap("DELTA: evaluate(): data_loader")
+            # compute output
             output = model(input)
             #_deltatime.lap("DELTA: evaluate(): model()")
 
@@ -178,6 +186,7 @@ def evaluate(data_loader, data_set, model):
             # 각 point 별 좌표와 confidence value [x, y, confidence]
             all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
             all_preds[idx:idx + num_images, :, 2:3] = maxvals
+            all_ids[idx] = meta['id']
             idx += num_images
 
             # measure elapsed time
@@ -194,20 +203,34 @@ def evaluate(data_loader, data_set, model):
                     save_debug_images(config, input, meta, None, dbg_pred*4, None, prefix)
             #_deltatime.lap("DELTA: evaluate(): done()")
 
-    return all_preds
+    return all_preds, all_ids
+
+
+infer_time_avg = AverageMeter()
+infer_count = 0
 
 def infer(dataset_dir, coco_kps_file, model):
+    global infer_time_avg, infer_count
+    
     logger.info('=> infer %s, %s' % (dataset_dir, coco_kps_file))
     _deltatime = DeltaTime()
 
     # data
     _deltatime.update()
     data_set, data_loader = load_data(dataset_dir, coco_kps_file)
-    _deltatime.lap("DELTA: load_data")
+    #_deltatime.lap("DELTA: load_data")
     # evaluate
-    all_preds = evaluate(data_loader, data_set, model)
-    _deltatime.lap("DELTA: evaluate")
-    return all_preds
+    all_preds, all_ids = evaluate(data_loader, data_set, model)
+    #_deltatime.lap("DELTA: evaluate")
+
+    infer_time_avg.update(_deltatime.lap_())
+    infer_count += 1
+    if infer_count % config.PRINT_FREQ == 0:
+        print('Avg time: {:.3f}'.format(infer_time_avg.avg))
+        infer_time_avg.reset()
+        infer_count = 0
+
+    return all_preds, all_ids
 
 def load_data(dataset_dir=None, kps_file=None):
     if not dataset_dir:

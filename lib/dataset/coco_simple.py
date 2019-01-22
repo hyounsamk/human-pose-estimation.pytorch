@@ -146,7 +146,7 @@ class COCOSimpleDataset(Dataset):
                     'center': center,
                     'scale': scale,
                     'filename': '',
-                    'imgnum': 0,
+                    'id': obj['id'],
                 })
 
         return rec
@@ -185,7 +185,7 @@ class COCOSimpleDataset(Dataset):
 
         image_file = db_rec['image']
         filename = db_rec['filename'] if 'filename' in db_rec else ''
-        imgnum = db_rec['imgnum'] if 'imgnum' in db_rec else 0
+        #imgnum = db_rec['imgnum'] if 'imgnum' in db_rec else 0
 
         data_numpy = cv2.imread(
             image_file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
@@ -214,9 +214,10 @@ class COCOSimpleDataset(Dataset):
         #_deltatime.lap("DELTA: COCOSimple(): transform()")
 
         meta = {
+            'id': db_rec['id'],
             'image': image_file,
             'filename': filename,
-            'imgnum': imgnum,
+            #'imgnum': imgnum,
             'center': c,
             'scale': s,
             'rotation': r,
